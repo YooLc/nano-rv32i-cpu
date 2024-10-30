@@ -13,7 +13,7 @@ module CtrlUnit (
     output wire MIO,
     output wire rs1use,
     output wire rs2use,
-    output wire [1:0] hazard_optype,
+    output reg [1:0] hazard_optype,
     output wire [2:0] ImmSel,
     output wire [2:0] cmp_ctrl,
     output wire [3:0] ALUControl,
@@ -121,9 +121,9 @@ module CtrlUnit (
                       {3{BGEU}} & cmp_GEU ; //to fill sth. in 
 
   // Using rs1
-  assign ALUSrc_A = JALR | B_valid | L_valid | S_valid | I_valid | R_valid;  //to fill sth. in 
+  assign ALUSrc_A = B_valid | L_valid | S_valid | I_valid | R_valid;  //to fill sth. in 
 
-  assign ALUSrc_B = B_valid | S_valid | R_valid;  //to fill sth. in 
+  assign ALUSrc_B = B_valid | R_valid;  //to fill sth. in 
 
   parameter ALU_ADD = 4'b0001;
   parameter ALU_SUB = 4'b0010;
@@ -158,10 +158,21 @@ module CtrlUnit (
 
   assign MIO = L_valid | S_valid;
 
-  assign rs1use = JALR | B_valid | L_valid | S_valid | I_valid | R_valid;  //to fill sth. in 
+  assign rs1use = (inst[19:15] != 5'b0) && (JALR | B_valid | L_valid | S_valid | I_valid | R_valid);  //to fill sth. in 
 
-  assign rs2use = B_valid | S_valid | R_valid;  //to fill sth. in 
+  assign rs2use = (inst[24:20] != 5'b0) && (B_valid | S_valid | R_valid);  //to fill sth. in 
 
-  assign hazard_optype = 0;  //to fill sth. in 
+  // ALU: 01, Load: 10, Store: 11, Other: 00
+  always @(*) begin
+    if (Lop) begin
+      hazard_optype = 2'b10;
+    end else if (Sop) begin
+      hazard_optype = 2'b11;
+    end else if (ALUControl != 4'b0) begin
+      hazard_optype = 2'b01;
+    end else begin
+      hazard_optype = 2'b00;
+    end
+  end
 
 endmodule

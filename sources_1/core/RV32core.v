@@ -88,7 +88,6 @@ module RV32core (
       .spo(inst_IF)
   );
 
-
   // ID
   REG_IF_ID reg_IF_ID (
       .clk(debug_clk),
@@ -162,8 +161,8 @@ module RV32core (
 
   MUX2T1_32 mux_branch_ID (
       .I0(PC_ID),
-      .I1(jump_PC_ID),
-      .s (Branch_ctrl),
+      .I1(rs1_data_ID),
+      .s (JALR),
       .o (addA_ID)
   );
 
@@ -271,7 +270,7 @@ module RV32core (
   );
 
   MUX2T1_32 mux_forward_EXE (
-      .I0(ALUB_EXE),
+      .I0(rs2_data_EXE),
       .I1(Datain_MEM),
       .s (forward_ctrl_ls),
       .o (Dataout_EXE)

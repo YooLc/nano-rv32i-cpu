@@ -1,16 +1,16 @@
 `timescale 1ns / 1ps
 
-module ROM_D(
-    input[6:0] a,
-    output[31:0] spo
+module ROM_D (
+    input  [ 6:0] a,
+    output [31:0] spo
 );
 
-    reg[31:0] inst_data[0:127];
+  reg [31:0] inst_data[0:127];
 
-    initial	begin
-        $readmemh("rom.mem", inst_data);
-    end
+  initial begin
+    $readmemh("D:\\rom.mem", inst_data);
+  end
 
-    assign spo = inst_data[a];
+  assign spo = inst_data[a];
 
 endmodule
