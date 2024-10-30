@@ -2,17 +2,20 @@
 
 module RAM_B (
     input  [31:0] addra,
-    input         clka,        // normal clock
+    input         clka,           // normal clock
     input  [31:0] dina,
     input         wea,
+    input         rea,
     output [31:0] douta,
-    input  [ 2:0] mem_u_b_h_w
+    input  [ 2:0] mem_u_b_h_w,
+    output        l_access_fault,
+    s_access_fault
 );
 
-  reg [7:0] data[0:127];
+  (* ram_style = "block" *) reg [7:0] data[0:127];
 
   initial begin
-    $readmemh("D:\\ram.mem", data);
+    $readmemh("ram.mem", data);
   end
 
   always @(negedge clka) begin
@@ -33,5 +36,8 @@ module RAM_B (
         mem_u_b_h_w[0] ? {mem_u_b_h_w[2] ? 16'b0 : {16{data[addra[6:0] + 1][7]}},
                     data[addra[6:0] + 1], data[addra[6:0]]} :
         {mem_u_b_h_w[2] ? 24'b0 : {24{data[addra[6:0]][7]}}, data[addra[6:0]]};
+
+  assign l_access_fault = rea & |addra[31:7];
+  assign s_access_fault = wea & |addra[31:7];
 
 endmodule

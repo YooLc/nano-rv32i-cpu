@@ -5,10 +5,10 @@ module ROM_D (
     output [31:0] spo
 );
 
-  reg [31:0] inst_data[0:127];
+  (* ram_style = "block" *) reg [31:0] inst_data[0:127];
 
   initial begin
-    $readmemh("D:\\rom.mem", inst_data);
+    $readmemh("rom.mem", inst_data);
   end
 
   assign spo = inst_data[a];
