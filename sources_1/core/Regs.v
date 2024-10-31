@@ -33,8 +33,8 @@ module Regs (
     output [31:0] Debug_regs   // debug data
 );
 
-  reg  [31:0] register     [1:31];  // r1 - r31
-  wire [31:0] register_next[1:31];  // The value of r1 - r31 in the next cycle 
+  reg  [31:0] register     [1:31];  // x1 - x31
+  wire [31:0] register_next[1:31];  // The value of x1 - x31 in the next cycle 
 
   genvar j;
   generate

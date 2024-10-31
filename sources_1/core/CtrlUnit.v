@@ -2,28 +2,28 @@
 
 
 module CtrlUnit (
-    input [31:0] inst,
-    input cmp_res,
-    output Branch,
-    ALUSrc_A,
-    ALUSrc_B,
-    DatatoReg,
-    RegWrite,
-    mem_w,
-    mem_r,
-    rs1use,
-    rs2use,
-    output [1:0] hazard_optype,
-    output [2:0] ImmSel,
-    cmp_ctrl,
-    output [3:0] ALUControl,
-    output JALR,
-    MRET,
+    input wire [31:0] inst,
+    input wire cmp_res,
+    output wire Branch,
+    output wire ALUSrc_A,
+    output wire ALUSrc_B,
+    output wire DatatoReg,
+    output wire RegWrite,
+    output wire mem_w,
+    output wire mem_r,
+    output wire rs1use,
+    output wire rs2use,
+    output wire [1:0] hazard_optype,
+    output wire [2:0] ImmSel,
+    output wire [2:0] cmp_ctrl,
+    output wire [3:0] ALUControl,
+    output wire JALR,
+    output wire MRET,
 
-    output csr_rw,
-    csr_w_imm_mux,
+    output wire csr_rw,
+    output wire csr_w_imm_mux,
 
-    output [1:0] exp_vector
+    output wire [1:0] exp_vector
 );
 
   wire [6:0] funct7 = inst[31:25];

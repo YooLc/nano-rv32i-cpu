@@ -373,6 +373,8 @@ module RV32core (
       .ecall_m(~isFlushed_WB & exp_vector_WB[2]),
       .l_access_fault(~isFlushed_WB & exp_vector_WB[1]),
       .s_access_fault(~isFlushed_WB & exp_vector_WB[0]),
+      .illegal_inst_ctrl(exp_vector_ctrl[1]),
+      .ecall_ctrl(exp_vector_ctrl[0]),
       .mret(mret_MEM),
 
       .epc_cur(PC_WB),

@@ -1,60 +1,183 @@
 `timescale 1ns / 1ps
 
 module ExceptionUnit (
-    input clk,
-    rst,
-    input csr_rw_in,
+    input wire clk,
+    input wire rst,
+    input wire csr_rw_in,
     // write/set/clear (funct bits from instruction)
-    input [1:0] csr_wsc_mode_in,
-    input csr_w_imm_mux,
-    input [11:0] csr_rw_addr_in,
-    input [31:0] csr_w_data_reg,
-    input [4:0] csr_w_data_imm,
-    output [31:0] csr_r_data_out,
+    input wire [1:0] csr_wsc_mode_in,
+    input wire csr_w_imm_mux,
+    input wire [11:0] csr_rw_addr_in,
+    input wire [31:0] csr_w_data_reg,
+    input wire [4:0] csr_w_data_imm,
+    output wire [31:0] csr_r_data_out,
 
-    input interrupt,
-    input illegal_inst,
-    input l_access_fault,
-    input s_access_fault,
-    input ecall_m,
+    input wire interrupt,
+    input wire illegal_inst,
+    input wire l_access_fault,
+    input wire s_access_fault,
+    input wire ecall_m,
+    input wire illegal_inst_ctrl,
+    input wire ecall_ctrl,
 
-    input mret,
+    input wire mret,
 
-    input [31:0] epc_cur,
-    input [31:0] epc_next,
-    output [31:0] PC_redirect,
-    output redirect_mux,
+    input wire [31:0] epc_cur,
+    input wire [31:0] epc_next,
+    output wire [31:0] PC_redirect,
+    output wire redirect_mux,
 
-    output reg_FD_flush,
-    reg_DE_flush,
-    reg_EM_flush,
-    reg_MW_flush,
-    output RegWrite_cancel,
-    output MemWrite_cancel
+    output reg  reg_FD_flush,
+    output reg  reg_DE_flush,
+    output reg  reg_EM_flush,
+    output reg  reg_MW_flush,
+    output wire RegWrite_cancel,
+    output wire MemWrite_cancel
 );
+
+  assign RegWrite_cancel = 1'b0;
+  assign MemWrite_cancel = 1'b0;
+
   // According to the diagram, design the Exception Unit
   // You can modify any code in this file if needed!
   reg [11:0] csr_waddr;
   reg [31:0] csr_wdata;
   reg csr_w;
-  reg [1:0] csr_wsc;
+  reg [1:0] csr_wsc;  // 01: wdata, 10: set bit, 11: unset bit
   wire [11:0] csr_raddr;
 
   wire [31:0] mstatus;
+  wire [31:0] mtvec;
+  wire [31:0] mepc_r;
   wire [31:0] csr_rdata;
+
+  reg exception_flag;
+  reg interrupt_flag;
+  reg [31:0] mcause_w;
+  reg [31:0] mtval_w;
+  reg [31:0] mepc_w;
 
   CSRRegs csr (
       .clk(clk),
       .rst(rst),
       .csr_w(csr_w),
+      .mret(mret),
       .raddr(csr_raddr),
       .waddr(csr_waddr),
-      .wdata(csr_wdata),
       .rdata(csr_rdata),
+      .wdata(csr_wdata),
+      .exception_unit_flag(exception_flag | interrupt_flag),
+      .mcause_w(mcause_w),
+      .mtval_w(mtval_w),
+      .mepc_w(mepc_w),
       .mstatus(mstatus),
+      .mtvec(mtvec),
+      .mepc_r(mepc_r),
       .csr_wsc_mode(csr_wsc)
   );
 
+  // mcause exception code
+  parameter [31:0] MCAUSE_ILLEGAL_INST = 32'd2;
+  parameter [31:0] MCAUSE_L_ACCESS_FAULT = 32'd5;
+  parameter [31:0] MCAUSE_S_ACCESS_FAULT = 32'd7;
+  parameter [31:0] MCAUSE_ECALL_M = 32'd11;
 
+  // mcause interrupt code
+  parameter [31:0] MCAUSE_SOFT_INT = 32'd3;
+
+  // CSR register addresses - mapped
+  parameter [11:0] CSR_MSTATUS = 12'h300;
+  parameter [11:0] CSR_MIE = 12'h304;
+  parameter [11:0] CSR_MTVEC = 12'h305;
+  parameter [11:0] CSR_MEPC = 12'h341;
+  parameter [11:0] CSR_MCAUSE = 12'h342;
+  parameter [11:0] CSR_MTVAL = 12'h343;
+
+  assign csr_raddr = csr_rw_addr_in;
+  assign csr_r_data_out = csr_rdata;
+
+  assign PC_redirect = mret ? mepc_r : mtvec;
+  assign redirect_mux = exception_flag | interrupt_flag | mret;
+
+  always @(posedge clk or posedge rst) begin
+    if (csr_w_imm_mux) begin
+      csr_wdata <= {27'b0, csr_w_data_imm};
+    end else begin
+      csr_wdata <= csr_w_data_reg;
+    end
+  end
+
+
+  // Generates mcause_w, mtval_w, mepc_w, and exception/interrupt flags
+  always @(*) begin
+    exception_flag = illegal_inst_ctrl | ecall_ctrl | l_access_fault | s_access_fault;
+    interrupt_flag = interrupt & mstatus[3];  // if MIE is set, then interrupt is enabled
+    if (exception_flag) begin
+      // Exception at ID stage
+      if (illegal_inst_ctrl) begin
+        mcause_w = MCAUSE_ILLEGAL_INST;
+        mtval_w = epc_cur;  // illegal instruction address
+        reg_DE_flush = 1'b1;
+        reg_EM_flush = 1'b0;
+        reg_MW_flush = 1'b0;
+      end else if (ecall_ctrl) begin
+        mcause_w = MCAUSE_ECALL_M;
+        mtval_w = 0;
+        reg_DE_flush = 1'b0;
+        reg_EM_flush = 1'b0;
+        reg_MW_flush = 1'b0;
+        // Exception at MEM stage
+      end else if (l_access_fault) begin
+        mcause_w = MCAUSE_L_ACCESS_FAULT;
+        mtval_w = 0;  // ?
+        reg_DE_flush = 1'b1;
+        reg_EM_flush = 1'b1;
+        reg_MW_flush = 1'b0;
+      end else if (s_access_fault) begin
+        mcause_w = MCAUSE_S_ACCESS_FAULT;
+        mtval_w = 0;  // ?
+        reg_DE_flush = 1'b1;
+        reg_EM_flush = 1'b1;
+        reg_MW_flush = 1'b0;
+      end
+      // For exception, mepc is the current PC
+      mepc_w = epc_cur;
+      reg_FD_flush = 1'b1;
+    end else if (interrupt_flag) begin
+      mcause_w = MCAUSE_SOFT_INT;
+      mtval_w  = 0;
+      // For interrupt, mepc is the PC that will be executed next
+      mepc_w   = epc_next;
+    end else begin
+      mcause_w = 0;
+      mtval_w  = 0;
+    end
+  end
+
+  // Write to CSR
+  always @(posedge clk or posedge rst) begin
+    if (rst) begin
+      csr_waddr <= 12'b0;
+      csr_wdata <= 32'b0;
+      csr_w <= 1'b0;
+      csr_wsc <= 2'b0;
+    end else if (exception_flag || interrupt_flag) begin
+      // Enter exception
+      csr_waddr <= CSR_MEPC;
+      csr_wsc   <= 2'b10;
+      csr_wdata <= epc_next;
+    end else if (mret) begin
+      // Return from exception
+      // MIE <- MPIE
+      csr_waddr <= CSR_MSTATUS;
+      csr_wsc   <= 2'b10;
+      csr_wdata <= {27'b0, mstatus[7], 3'b0};
+    end else begin
+      // Normal CSR operation
+      csr_waddr <= csr_rw_addr_in;
+      csr_wsc <= csr_wsc_mode_in;
+      csr_w <= csr_rw_in;
+    end
+  end
 
 endmodule
