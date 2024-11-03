@@ -68,6 +68,7 @@ module RV32core (
   wire [3:0] exp_vector_WB;
   wire [4:0] rd_WB;
   wire [31:0] wt_data_WB, PC_WB, inst_WB, ALUout_WB, Datain_WB;
+  wire mret_WB;
 
 
   // IF
@@ -373,12 +374,12 @@ module RV32core (
       .ecall_m(~isFlushed_WB & exp_vector_WB[2]),
       .l_access_fault(~isFlushed_WB & exp_vector_WB[1]),
       .s_access_fault(~isFlushed_WB & exp_vector_WB[0]),
-      .illegal_inst_ctrl(exp_vector_ctrl[1]),
-      .ecall_ctrl(exp_vector_ctrl[0]),
-      .mret(mret_MEM),
+      .mret(mret_MEM), // ?
 
       .epc_cur(PC_WB),
+      .epc_cur_inst(inst_WB),
       .epc_next(~isFlushed_MEM ? PC_MEM : ~isFlushed_EXE ? PC_EXE : ~isFlushed_ID ? PC_ID : PC_IF),
+      .mem_cur_addr(ALUout_WB),
       .PC_redirect(PC_redirect_exp),
       .redirect_mux(redirect_mux_exp),
       .reg_FD_flush(reg_FD_flush_exp),
@@ -411,6 +412,7 @@ module RV32core (
       .DatatoReg_MEM(DatatoReg_MEM),
       .RegWrite_MEM(RegWrite_MEM),
       .exp_vector_MEM({exp_vector_MEM, l_access_fault_MEM, s_access_fault_MEM}),
+      .mret_MEM(mret_MEM),
 
       .PCurrent_WB(PC_WB),
       .IR_WB(inst_WB),
@@ -420,7 +422,8 @@ module RV32core (
       .DatatoReg_WB(DatatoReg_WB),
       .RegWrite_WB(RegWrite_WB),
       .isFlushed(isFlushed_WB),
-      .exp_vector_WB(exp_vector_WB)
+      .exp_vector_WB(exp_vector_WB),
+      .mret_WB(mret_WB)
   );
 
   MUX2T1_32 mux_WB (

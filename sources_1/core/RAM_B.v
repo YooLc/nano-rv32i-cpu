@@ -15,7 +15,7 @@ module RAM_B (
   (* ram_style = "block" *) reg [7:0] data[0:127];
 
   initial begin
-    $readmemh("/home/yoolc/Xilinx/arch-exp/arch-exp.srcs/sources_1/imports/ram.mem", data);
+    $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\imports\\ram.mem", data);
   end
 
   always @(negedge clka) begin

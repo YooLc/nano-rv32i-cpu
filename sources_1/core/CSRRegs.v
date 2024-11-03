@@ -31,12 +31,12 @@ module CSRRegs (
 
   assign mstatus = CSR[0];
   assign mtvec   = CSR[5];
-  assign mepc_r  = CSR[9];
+  assign mepc_r  = (csr_w == 1'b1 && waddr_valid == 3'h9) ? wdata : CSR[9]; // Forward here
 
   assign rdata   = CSR[raddr_map];
 
-  wire [31:0] mstatus_mie = (CSR[0] & ~32'h8) | (CSR[0][3] << 4);  // Clear MIE and set MPIE
-  wire [31:0] mstatus_ret = CSR[0] | (CSR[0][7] << 3);  // Set MIE to MPIE
+  wire [31:0] mstatus_mie = (CSR[0] & ~32'h8) | (CSR[0][3] << 7);  // Clear MIE and set MPIE
+  wire [31:0] mstatus_ret = {CSR[0][31:8], CSR[0][3], CSR[0][6:4], CSR[0][7], CSR[0][2:0]};  // MIE <- MPIE, MPIE <- 0
 
   wire mie = CSR[0][3];
   wire mpie = CSR[0][7];
@@ -60,11 +60,11 @@ module CSRRegs (
       CSR[13] <= 0;
       CSR[14] <= 0;
       CSR[15] <= 0;
-      priv_mode <= 2'b0;
-    end else if (csr_w) begin
+      priv_mode <= 2'b11; // Machine Mode
+    end else if (exception_unit_flag | mret) begin
       if (exception_unit_flag) begin
         // Exception handling
-        priv_mode <= 2'b0;
+        priv_mode <= 2'b11;
         CSR[0] <= {mstatus_mie[31:13], priv_mode, mstatus_mie[10:0]};  // Set MPP to priv_mode
         CSR[9] <= mepc_w;
         CSR[10] <= mcause_w;
@@ -72,8 +72,6 @@ module CSRRegs (
       end else if (mret) begin
         priv_mode <= CSR[0][12:11];  // priv_mode <- MPP
         CSR[0] <= {mstatus_ret[31:13], 2'b0, mstatus_ret[10:0]};
-      end else begin
-        // Normal write
         case (csr_wsc_mode)
           2'b01:   CSR[waddr_map] = wdata;
           2'b10:   CSR[waddr_map] = CSR[waddr_map] | wdata;
@@ -81,6 +79,14 @@ module CSRRegs (
           default: CSR[waddr_map] = wdata;
         endcase
       end
+    end else if (csr_w) begin
+      // Normal write
+      case (csr_wsc_mode)
+        2'b01:   CSR[waddr_map] = wdata;
+        2'b10:   CSR[waddr_map] = CSR[waddr_map] | wdata;
+        2'b11:   CSR[waddr_map] = CSR[waddr_map] & ~wdata;
+        default: CSR[waddr_map] = wdata;
+      endcase
     end
   end
 endmodule

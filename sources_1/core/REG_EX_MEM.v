@@ -81,7 +81,7 @@ module REG_EX_MEM (
       csr_w_imm_mux_MEM <= 0;
     end else if (EN) begin  //EX级正常传输到MEM�?
       if (flush) begin
-        IR_MEM         <= 0;
+        IR_MEM         <= 32'h00000013;
         PCurrent_MEM   <= PCurrent_EX;
         rd_MEM         <= 0;
         rs1_MEM        <= 0;

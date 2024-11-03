@@ -93,7 +93,7 @@ module REG_ID_EX (
       csr_w_imm_mux_EX <= 0;
     end else if (EN) begin
       if (flush) begin  //数据冲突时冲刷流水线禁止改变CPU状�??
-        IR_EX         <= 32'h00000000;  //nop,废弃当前取脂 : 插入32'h00000013
+        IR_EX         <= 32'h00000013;  //nop,废弃当前取脂 : 插入32'h00000013
         rd_EX         <= 0;  //cancel Instruction write address
         RegWrite_EX   <= 0;  //寄存器写信号：禁止寄存器�?
         WR_EX         <= 0;  //cancel write memory

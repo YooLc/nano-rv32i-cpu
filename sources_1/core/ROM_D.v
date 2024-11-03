@@ -8,7 +8,7 @@ module ROM_D (
   (* ram_style = "block" *) reg [31:0] inst_data[0:127];
 
   initial begin
-    $readmemh("/home/yoolc/Xilinx/arch-exp/arch-exp.srcs/sources_1/imports/rom.mem", inst_data);
+    $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\imports\\rom.mem", inst_data);
   end
 
   assign spo = inst_data[a];
