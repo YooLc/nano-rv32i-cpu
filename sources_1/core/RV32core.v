@@ -33,7 +33,7 @@ module  RV32core(
     wire[1:0] forward_ctrl_A, forward_ctrl_B;
 
 	wire PC_EN_IF;
-	wire [31:0] PC_IF, next_PC_IF, PC_4_IF, inst_IF, final_PC_IF;
+	wire [31:0] PC_IF, PC_4_IF, inst_IF, final_PC_IF;
 
     wire reg_FD_stall, reg_FD_flush, isFlushed_ID, cmp_res_ID;
     wire [31:0] jump_PC_ID, PC_ID, inst_ID, Debug_regs, rs1_data_reg, rs2_data_reg,
@@ -67,24 +67,67 @@ module  RV32core(
     wire[4:0] rd_WB;
     wire [31:0] wt_data_WB, PC_WB, inst_WB, ALUout_WB, Datain_WB;
 
+    wire predict_taken, btb_hit;
+    wire [31:0] Predict_PC;
+    wire ID_branch;
+
+    reg predicted = 1'b0;
+    wire predict_do_branch;
+    always @ (posedge clk or posedge rst) begin
+        if (rst) begin
+            predicted <= 1'b0;
+        end else if (!reg_FD_stall & !reg_FD_flush) begin // Fetched from predictor, important!
+            predicted <= predict_do_branch;
+        end
+    end
 
     // IF
     REG32 REG_PC(.clk(debug_clk),.rst(rst),.CE(PC_EN_IF),.D(next_PC_IF),.Q(PC_IF));
     
     add_32 add_IF(.a(PC_IF),.b(32'd4),.c(PC_4_IF));
 
-    MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(jump_PC_ID),.s(Branch_ctrl),.o(next_PC_IF));        
+    // MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(jump_PC_ID),.s(Branch_ctrl),.o(next_PC_IF));
+    reg [31:0] next_PC_IF;
+    reg predict_failed;
+    always @(*) begin
+        if (ID_branch) begin // Current is branch / jal / jalr
+            if (Branch_ctrl) begin // Branch is taken
+                if (PC_IF == jump_PC_ID) begin // Success prediction
+                    next_PC_IF = Predict_PC;
+                    predict_failed = 0;
+                end else begin // Fail prediction, must flush
+                    next_PC_IF = jump_PC_ID;
+                    predict_failed = 1;
+                end
+            end else begin // Branch is not taken
+                if (predicted) begin // Predict failed, must flush
+                    next_PC_IF = PC_ID + 32'd4;
+                    predict_failed = 1;
+                end else begin // Normal Case
+                    next_PC_IF = Predict_PC;
+                    predict_failed = 0;
+                end
+            end
+        end else begin
+            next_PC_IF = Predict_PC;
+            predict_failed = 0;
+        end
+    end
 
     ROM_D inst_rom(.a(PC_IF[9:2]),.spo(inst_IF));
 
+    BTB BranchModule(
+        .clk(clk), .rst(rst),
+        .IF_PC(PC_IF), .IF_PC_4(PC_4_IF), .ID_PC(PC_ID), .ID_Jump_PC(jump_PC_ID), .ID_branch(ID_branch), .ID_taken(Branch_ctrl),
+        .predict_taken(predict_taken), .predict_do_branch(predict_do_branch), .btb_hit(btb_hit), .Predict_PC(Predict_PC)
+    );
 
     // ID
     REG_IF_ID reg_IF_ID(.clk(debug_clk),.rst(rst),.EN(1'b1),.Data_stall(reg_FD_stall),
         .flush(reg_FD_flush),.PCOUT(PC_IF),.IR(inst_IF),
-
         .IR_ID(inst_ID),.PCurrent_ID(PC_ID),.isFlushed(isFlushed_ID));
     
-    CtrlUnit ctrl(.inst(inst_ID),.cmp_res(cmp_res_ID),.Branch(Branch_ctrl),.ALUSrc_A(ALUSrc_A_ctrl),
+    CtrlUnit ctrl(.inst(inst_ID),.cmp_res(cmp_res_ID),.IsBranch(ID_branch),.Branch(Branch_ctrl),.ALUSrc_A(ALUSrc_A_ctrl),
         .ALUSrc_B(ALUSrc_B_ctrl),.DatatoReg(DatatoReg_ctrl),.RegWrite(RegWrite_ctrl),
         .mem_w(mem_w_ctrl),.mem_r(mem_r_ctrl),.rs1use(rs1use_ctrl),.rs2use(rs2use_ctrl),
         .hazard_optype(hazard_optype_ctrl),.ImmSel(ImmSel_ctrl),.cmp_ctrl(cmp_ctrl),
@@ -111,7 +154,7 @@ module  RV32core(
 
     cmp_32 cmp_ID(.a(rs1_data_ID),.b(rs2_data_ID),.ctrl(cmp_ctrl),.c(cmp_res_ID));
     
-    HazardDetectionUnit hazard_unit(.clk(debug_clk),.Branch_ID(Branch_ctrl),.rs1use_ID(rs1use_ctrl),
+    HazardDetectionUnit hazard_unit(.clk(debug_clk),.Branch_ID(predict_failed),.rs1use_ID(rs1use_ctrl),
         .rs2use_ID(rs2use_ctrl),.hazard_optype_ID(hazard_optype_ctrl),.rd_EXE(rd_EXE),
         .rd_MEM(rd_MEM),.rs1_ID(inst_ID[19:15]),.rs2_ID(inst_ID[24:20]),.rs2_EXE(rs2_EXE),
         .PC_EN_IF(PC_EN_IF),.reg_FD_stall(reg_FD_stall),.reg_FD_flush(reg_FD_flush),

@@ -4,7 +4,7 @@
 module CtrlUnit(
     input[31:0] inst,
     input cmp_res,
-    output Branch, ALUSrc_A, ALUSrc_B, DatatoReg, RegWrite, mem_w,
+    output IsBranch, Branch, ALUSrc_A, ALUSrc_B, DatatoReg, RegWrite, mem_w,
         mem_r, rs1use, rs2use,
     output [1:0] hazard_optype,
     output [2:0] ImmSel, cmp_ctrl,
@@ -100,7 +100,7 @@ module CtrlUnit(
     wire S_valid = SW | SH | SB;
     wire CSR_valid = CSRRW | CSRRS | CSRRC | CSRRWI | CSRRSI | CSRRCI;
 
-
+    assign IsBranch = B_valid | JAL | JALR;
     assign Branch = JAL | JALR | B_valid & cmp_res;
 
     localparam Imm_type_I = 3'b001;

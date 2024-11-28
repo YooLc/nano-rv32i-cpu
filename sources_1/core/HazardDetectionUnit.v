@@ -36,7 +36,7 @@ module HazardDetectionUnit(
 
     assign PC_EN_IF = ~load_stall;
     assign reg_FD_stall = load_stall;
-    assign reg_FD_flush = Branch_ID;
+    assign reg_FD_flush = Branch_ID; // Important
     assign reg_DE_flush = load_stall;
 
     assign forward_ctrl_A = rs1_forward_1 ?  2'd1 : rs1_forward_2 ?  2'd2 : rs1_forward_3 ?  2'd3 : 2'b0 ;
