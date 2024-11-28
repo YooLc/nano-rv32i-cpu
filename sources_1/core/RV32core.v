@@ -82,12 +82,12 @@ module  RV32core(
     end
 
     // IF
+    reg [31:0] next_PC_IF;
     REG32 REG_PC(.clk(debug_clk),.rst(rst),.CE(PC_EN_IF),.D(next_PC_IF),.Q(PC_IF));
     
     add_32 add_IF(.a(PC_IF),.b(32'd4),.c(PC_4_IF));
 
     // MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(jump_PC_ID),.s(Branch_ctrl),.o(next_PC_IF));
-    reg [31:0] next_PC_IF;
     reg predict_failed;
     always @(*) begin
         if (ID_branch) begin // Current is branch / jal / jalr

@@ -14,10 +14,10 @@ module BTB(
     output reg btb_hit,
     output reg [31:0] Predict_PC
 );
-    // 16 Entries BHT, direct map
-    reg [1:0] bht[0:15];
+    // 64 Entries BHT, direct map
+    reg [1:0] bht[0:255];
     // 16 Entries BTB, fully associative
-    reg [63:0] btb[0:15];
+    reg [63:0] btb[0:63];
 
     parameter [1:0] BHT_NT_00 = 2'b00;
     parameter [1:0] BHT_NT_01 = 2'b01;
@@ -26,14 +26,14 @@ module BTB(
 
     integer i;
     // Lookup BHT with IF
-    wire [3:0] bht_idx_IF = IF_PC[5:2];
+    wire [7:0] bht_idx_IF = IF_PC[9:2];
     assign predict_taken = bht[bht_idx_IF][1];
 
     // Update BHT with ID
-    wire [3:0] bht_idx_ID = ID_PC[5:2];
+    wire [7:0] bht_idx_ID = ID_PC[9:2];
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            for (i = 0; i < 16; i = i + 1) begin
+            for (i = 0; i < 256; i = i + 1) begin
                 bht[i] <= BHT_NT_00;
             end
         end else if (ID_branch) begin
@@ -61,7 +61,7 @@ module BTB(
     always @(*) begin
         btb_hit = 1'b0; // 阻塞赋值
         btb_target = 32'b0;
-        for (i = 0; i < 16; i = i + 1) begin
+        for (i = 0; i < 64; i = i + 1) begin
             if (btb[i][63:32] == IF_PC) begin
                 btb_hit = 1'b1;
                 btb_target = btb[i][31:0];
@@ -71,12 +71,12 @@ module BTB(
     end
 
     // Update BTB with ID
-    reg [3:0] replace_ptr;
+    reg [5:0] replace_ptr;
     reg [3:0] match_index;
     reg match_found;
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            for (i = 0; i < 16; i = i + 1) begin
+            for (i = 0; i < 64; i = i + 1) begin
                 btb[i] <= 64'h0;
             end
             replace_ptr <= 4'h0;
@@ -85,7 +85,7 @@ module BTB(
                 // Check if ID_PC is already in BTB
                 match_found = 1'b0;
                 match_index = 4'h0;
-                for (i = 0; i < 16; i = i + 1) begin
+                for (i = 0; i < 64; i = i + 1) begin
                     if (btb[i][63:32] == ID_PC) begin
                         match_found = 1'b1;
                         match_index = i;
