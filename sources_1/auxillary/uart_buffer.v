@@ -5,6 +5,7 @@ module uart_buffer (
     input wire ready,
     input wire [7:0] sim_uart_char,
     input wire sim_uart_char_valid,
+    input wire add_cr,
     output wire busy,
     output reg send,
     output reg [7:0] datao
@@ -37,7 +38,14 @@ module uart_buffer (
             end
             if (sim_uart_char_valid) begin
                 buffer[tail] <= sim_uart_char;
-                tail <= next_tail;
+                if(add_cr && sim_uart_char == 8'h0a)begin
+                    buffer[tail+1] <= 8'h0d;
+                    tail <= (tail == SIZE-2)? 0 : 
+                            (tail == SIZE-1)? 1 : tail+2;
+                end
+                else begin
+                    tail <= next_tail;
+                end
                 full <= next_tail == next_head;
             end
             if (send == 1'b1) begin
