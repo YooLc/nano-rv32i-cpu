@@ -81,7 +81,7 @@ module top (
     
     wire [6:0] debug_addr;
     wire [31:0] debug_data;
-    
+
     // DEBUG & UART
     // 0 - debug_en
     // 1~5 - debug_addr
@@ -97,21 +97,19 @@ module top (
     wire uart_send, uart_ready;
     wire [7:0] uart_data;
 
-    wire [7:0]sim_uart_char_ram;
-    wire sim_uart_char_valid_ram;
-    wire [7:0] sim_uart_char = SW[13]?sim_uart_char_ram : uart_char_debug;
-    wire sim_uart_char_valid = SW[13]?sim_uart_char_valid_ram : uart_valid_debug;
+    wire [7:0] sim_uart_char = uart_char_debug;
+    wire sim_uart_char_valid = uart_valid_debug;
 
     wire [4:0] uart_debug_reg;
     wire [31:0] wb_pc;
     wire [31:0] wb_inst;
-    wire [31:0] mem_addr, mem_data;
 
     wire uart_busy;
 
     assign debug_addr = debug_by_uart? {2'b00, uart_debug_reg} : SW[7:1];
+
+    wire [31:0]mem_addr, mem_data;
     
-  
     RV32core core(
         .debug_en(SW[0]),
         .debug_step(btn_step),
@@ -123,10 +121,7 @@ module top (
         .wb_inst(wb_inst),
         .mem_addr(mem_addr),
         .mem_data(mem_data),
-        .interrupter(SW[12]),
-        
-        .sim_uart_char_out(sim_uart_char_ram),
-        .sim_uart_char_valid(sim_uart_char_valid_ram)
+        .interrupter(SW[12])
         );
 
     display DISPLAY (
@@ -143,21 +138,6 @@ module top (
         .seg_an(AN),
         .led_clr_n()
         );
-       
-//    VGA_TESTP  vga(.clk(clk100MHz),
-//                    .clk25(clk_disp),
-//                    .Debug_addr(),
-//                    .Debug_data(debug_data),
-//                    .MEM_Addr(0),
-//                    .MEM_Data(0),
-//                    .SWO15(SW[15]),
-//                    .SWO14(SW[14]),
-//                    .SWO13(SW[13]),
-//                    .Red(VGA_R),
-//                    .Green(VGA_G),
-//                    .Blue(VGA_B),
-//                    .VSYNC(VS),
-//                    .HSYNC(HS));
 
     UART_TX_CTRL uart_tx_ctrl (
         .SEND(uart_send),
@@ -173,7 +153,6 @@ module top (
         .ready(uart_ready),
         .sim_uart_char_valid(sim_uart_char_valid),
         .sim_uart_char(sim_uart_char),
-        .add_cr(SW[13]),
         .send(uart_send),
         .busy(uart_busy),
         .datao(uart_data)
@@ -194,4 +173,5 @@ module top (
         .sim_uart_char(uart_char_debug),
         .sim_uart_char_valid(uart_valid_debug)
     );
+    
 endmodule

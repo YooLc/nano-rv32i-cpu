@@ -38,11 +38,7 @@ module    REG_ID_EX(input clk,                                         //ID/EX L
                     input RegWrite,                                    //当前指令译码：寄存器写信�?
                     input WR,                                          //当前指令译码：存储器读写信号
                     input [2:0] u_b_h_w,
-                    input mem_r,
-                    input csr_rw,
-                    input csr_w_imm_mux,
-                    input mret,
-                    input[1:0] exp_vector,
+                    input MIO,
 
                     output reg[31:0] PCurrent_EX,                      //锁存当前译码指令地址
                     output reg[31:0] IR_EX,                            //锁存当前译码指令(测试)
@@ -59,65 +55,56 @@ module    REG_ID_EX(input clk,                                         //ID/EX L
                     output reg       RegWrite_EX,                      //锁存当前译码指令寄存器写信号
                     output reg       WR_EX,                            //锁存当前译码指令存储器读写信�?
                     output reg[2:0]  u_b_h_w_EX,
-                    output reg       mem_r_EX,
-                    output reg       isFlushed,
-                    output reg       csr_rw_EX,
-                    output reg       csr_w_imm_mux_EX,
-                    output reg       mret_EX,
-                    output reg[1:0]  exp_vector_EX
+                    output reg       MIO_EX
                 );
 
-    always @(posedge clk or posedge rst) begin                           //ID/EX Latch
-        if(rst) begin
-            rd_EX         <= 0;
-            RegWrite_EX   <= 0;
-            WR_EX         <= 0;
-            IR_EX         <= 32'h00000000;
-            PCurrent_EX   <= 32'h00000000 ;
-            rs1_EX        <= 0;
-            rs2_EX        <= 0;
-            mem_r_EX        <= 0;
-            isFlushed     <= 0;
-            csr_rw_EX     <= 0;
-            mret_EX       <= 0;
-            exp_vector_EX <= 0;
-        end
-        else if(EN)begin
+    always @(posedge clk ) begin                           //ID/EX Latch
+    if(rst) begin
+        rd_EX        <= 0;
+        RegWrite_EX  <= 0;
+        WR_EX        <= 0;
+        IR_EX        <= 32'h00000000;
+        PCurrent_EX  <= 32'h00000000 ;
+        rs1_EX       <= 0;
+        rs2_EX       <= 0;
+        MIO_EX       <= 0;
+        A_EX         <= 0;
+        B_EX         <= 0;
+        Imm32_EX     <= 0;
+        ALUSrc_A_EX  <= 0;
+        ALUSrc_B_EX  <= 0;
+        ALUC_EX      <= 0;
+        DatatoReg_EX <= 0;
+        u_b_h_w_EX   <= 0;
+    end
+    else if(EN)begin
             if(flush)begin                               //数据冲突时冲刷流水线禁止改变CPU状�??
-                IR_EX         <= 32'h00000000;             //nop,废弃当前取脂 : 插入32'h00000013
-                rd_EX         <= 0;                        //cancel Instruction write address
-                RegWrite_EX   <= 0;                        //寄存器写信号：禁止寄存器�?
-                WR_EX         <= 0;                        //cancel write memory
-                PCurrent_EX   <= PCurrent_ID;              //传�?�PC(测试)
-                mem_r_EX        <= 0;
-                isFlushed     <= 1;
-                csr_rw_EX     <= 0;
-                mret_EX       <= 0;
-                exp_vector_EX <= 0;
+                IR_EX       <= 32'h00000000;             //nop,废弃当前取脂 : 插入32'h00000013
+                rd_EX       <= 0;                        //cancel Instruction write address
+                RegWrite_EX <= 0;                        //寄存器写信号：禁止寄存器�?
+                WR_EX       <= 0;                        //cancel write memory
+                PCurrent_EX <= PCurrent_ID;              //传�?�PC(测试)
+                MIO_EX       <= 0;
             end
-            else begin                                       //无数据冲突正常传输到EX�?
-                PCurrent_EX      <= PCurrent_ID;              //传�?�当前指令地�?
-                IR_EX            <= IR_ID;                    //传�?�当前指令地�?(测试)
-                A_EX             <= rs1_data;                 //传�?�寄存器A读出数据
-                B_EX             <= rs2_data;                 //传�?�寄存器B读出数据
-                Imm32_EX         <= Imm32;                    //传�?�扩展后立即�?
-                rd_EX            <= rd_addr;                  //传�?�写目的寄存器地�?
-                rs1_EX           <= rs1_addr;
-                rs2_EX           <= rs2_addr;
-                ALUSrc_A_EX      <= ALUSrc_A;                 //传�?�ALU A通道控制信号
-                ALUSrc_B_EX      <= ALUSrc_B;                 //传�?�ALU B通道控制信号
-                ALUC_EX          <= ALUC;                     //传�?�ALU操作功能控制信号
-                DatatoReg_EX     <= DatatoReg;               //传�?�REG写数据�?�道选择
-                RegWrite_EX      <= RegWrite;                 //传�?�寄存器写信�?
-                WR_EX            <= WR;                       //传�?�存储器读写信号
-                u_b_h_w_EX       <= u_b_h_w;
-                mem_r_EX         <= mem_r;
-                isFlushed        <= 0;
-                csr_rw_EX        <= csr_rw;
-                mret_EX          <= mret;
-                exp_vector_EX    <= exp_vector;
-                csr_w_imm_mux_EX <= csr_w_imm_mux;
-            end
+            else begin                                   //无数据冲突正常传输到EX�?
+                PCurrent_EX <= PCurrent_ID;              //传�?�当前指令地�?
+                IR_EX       <= IR_ID;                    //传�?�当前指令地�?(测试)
+                A_EX        <= rs1_data;                 //传�?�寄存器A读出数据
+                B_EX        <= rs2_data;                 //传�?�寄存器B读出数据
+                Imm32_EX    <= Imm32;                    //传�?�扩展后立即�?
+                rd_EX       <= rd_addr;                  //传�?�写目的寄存器地�?
+                rs1_EX      <= rs1_addr;
+                rs2_EX      <= rs2_addr;
+                ALUSrc_A_EX <= ALUSrc_A;                 //传�?�ALU A通道控制信号
+                ALUSrc_B_EX <= ALUSrc_B;                 //传�?�ALU B通道控制信号
+                ALUC_EX     <= ALUC;                     //传�?�ALU操作功能控制信号
+                DatatoReg_EX<= DatatoReg;               //传�?�REG写数据�?�道选择
+                RegWrite_EX <= RegWrite;                 //传�?�寄存器写信�?
+                WR_EX       <= WR;                       //传�?�存储器读写信号
+                u_b_h_w_EX    <= u_b_h_w;
+                MIO_EX       <= MIO;
+
+                end
         end
     end
 

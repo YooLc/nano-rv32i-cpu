@@ -54,7 +54,8 @@ module  CPUTEST(input[31:0]PC_IF,               //IF阶段PC指针信号
                 input RegWrite,                 //寄存器写信号 (WB阶段)
                 input data_hazard,              //数据冲突控制信号
                 input control_hazard,           //控制冲突控制信号
-                input[31:0] exp_sig,
+                input[2:0] cmu_state,           //cmu当前状态
+                input[2:0] ram_state,           //ram当前状态
                 input[4:0]Debug_addr,           //采样时序地址
                 output reg [31:0] Test_signal   //采样输出数据
                 );
@@ -73,7 +74,7 @@ module  CPUTEST(input[31:0]PC_IF,               //IF阶段PC指针信号
 
             8: Test_signal = PC_EXE;      
             9: Test_signal = inst_EXE;    
-            10: Test_signal = exp_sig;
+            10: Test_signal = {13'h0, cmu_state, 13'h0, ram_state};
             11: Test_signal = PCJump;
 
             12: Test_signal = PC_MEM; 

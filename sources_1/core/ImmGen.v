@@ -5,11 +5,11 @@ module ImmGen(
             input  wire [31:0] inst_field,
             output[31:0] Imm_out
     );
-    localparam Imm_type_I = 3'b001;
-    localparam Imm_type_B = 3'b010;
-    localparam Imm_type_J = 3'b011;
-    localparam Imm_type_S = 3'b100;
-    localparam Imm_type_U = 3'b101;
+    parameter Imm_type_I = 3'b001;
+    parameter Imm_type_B = 3'b010;
+    parameter Imm_type_J = 3'b011;
+    parameter Imm_type_S = 3'b100;
+    parameter Imm_type_U = 3'b101;
 
     wire I = ImmSel == Imm_type_I;
     wire B = ImmSel == Imm_type_B;
