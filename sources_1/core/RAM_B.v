@@ -12,7 +12,7 @@ module RAM_B(
     reg[7:0] data[0:127];
 
     initial	begin
-        $readmemh("ram.mem", data);
+        $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\core\\ram.mem", data);
     end
 
     always @ (negedge clka) begin
