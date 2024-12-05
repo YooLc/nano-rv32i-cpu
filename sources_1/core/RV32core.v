@@ -1,224 +1,178 @@
 `timescale 1ns / 1ps
 
-
 module  RV32core(
         input debug_en,  // debug enable
         input debug_step,  // debug step clock
         input [6:0] debug_addr,  // debug address
         output[31:0] debug_data,  // debug data
-        output[31:0] wb_pc,
-        output[31:0] wb_inst,
-        output[31:0] mem_addr,
-        output[31:0] mem_data,
+        output[31:0] wb_addr,
+        output[31:0] wb_data,
+        output reg [31:0] clk_counter,
         input clk,  // main clock
         input rst,  // synchronous reset
         input interrupter  // interrupt source, for future use
-	);
+    );
 
-	wire debug_clk;
+    wire debug_clk;
+    wire[31:0] debug_regs;
+    reg[31:0] Test_signal;
+	assign debug_data = debug_addr[5] ? Test_signal : debug_regs;
 
-	debug_clk clock(.clk(clk),.debug_en(debug_en),.debug_step(debug_step),.debug_clk(debug_clk));
+    debug_clk clock(.clk(clk),.debug_en(debug_en),.debug_step(debug_step),.debug_clk(debug_clk));
 
-    wire Branch_ctrl, JALR, RegWrite_ctrl, mem_w_ctrl, MIO_ctrl,
-        ALUSrc_A_ctrl, ALUSrc_B_ctrl, DatatoReg_ctrl, rs1use_ctrl, rs2use_ctrl;
-    wire[1:0] hazard_optype_ctrl;
-    wire[2:0] ImmSel_ctrl, cmp_ctrl;
+    wire PC_EN_IF, IS_EN, FU_ALU_EN, FU_mem_EN, FU_mul_EN, FU_div_EN, FU_jump_EN;
+    wire RegWrite_ctrl, ALUSrcA_ctrl, ALUSrcB_ctrl, mem_w_ctrl;
+    wire[2:0] ImmSel_ctrl, bhw_ctrl, DatatoReg_ctrl;
     wire[3:0] ALUControl_ctrl;
-
-    wire forward_ctrl_ls;
-    wire[1:0] forward_ctrl_A, forward_ctrl_B;
-
-	wire PC_EN_IF;
-	wire [31:0] PC_IF, next_PC_IF, PC_4_IF, inst_IF;
-
-    wire reg_FD_EN,reg_FD_stall,reg_FD_flush, cmp_res_ID;
-    wire [31:0] jump_PC_ID, PC_ID, inst_ID, Debug_regs, rs1_data_reg, rs2_data_reg,
-        Imm_out_ID, rs1_data_ID, rs2_data_ID, addA_ID;
-    
-    wire reg_DE_EN, reg_DE_flush, RegWrite_EXE, mem_w_EXE, MIO_EXE,
-        ALUSrc_A_EXE, ALUSrc_B_EXE, ALUzero_EXE, ALUoverflow_EXE, DatatoReg_EXE;
-    wire[2:0] u_b_h_w_EXE;
-    wire[3:0] ALUControl_EXE;
-    wire[4:0] rs1_EXE, rs2_EXE, rd_EXE;
-    wire[31:0] ALUout_EXE, PC_EXE, inst_EXE, rs1_data_EXE, rs2_data_EXE, Imm_EXE,
-        ALUA_EXE, ALUB_EXE, Dataout_EXE;
-    
-    wire reg_EM_EN, reg_EM_flush, RegWrite_MEM, DatatoReg_MEM, mem_w_MEM, MIO_MEM;
-    wire[2:0] u_b_h_w_MEM;
-    wire[4:0] rd_MEM;
-    wire[31:0] ALUout_MEM, PC_MEM, inst_MEM, Dataout_MEM, Datain_MEM;
-    wire cmu_stall;
-    wire [31:0] ram_addr;
-    wire ram_cs;
-    wire ram_we;
-    wire [31:0] ram_din;
-    wire [31:0] ram_dout;
-    wire ram_ack;
-    wire [2:0] cmu_state;
-    wire [2:0] ram_state;
+    wire[4:0] Jump_ctrl;
+    wire[4:0] rs1_addr_ctrl, rs2_addr_ctrl, rd_ctrl;
+    wire[31:0] PC_ctrl, imm_ctrl;
 
 
-    wire reg_MW_EN, RegWrite_WB, DatatoReg_WB;
-    wire[4:0] rd_WB;
-    wire [31:0] wt_data_WB, PC_WB, inst_WB, ALUout_WB, Datain_WB;
+    wire [31:0] PC_IF, next_PC_IF, PC_4_IF, inst_IF;
+
+    wire[31:0]inst_IS, PC_IS, Imm_out_IS;
+
+    wire[31:0]rs1_data_RO, rs2_data_RO, ALUA_RO, ALUB_RO;
+
+    wire FU_ALU_finish, FU_mem_finish, FU_mul_finish, FU_div_finish, FU_jump_finish, is_jump_FU;
+    wire[31:0]ALUout_FU, mem_data_FU, mulres_FU, divres_FU, PC_jump_FU, PC_wb_FU;
+
+    wire[31:0]ALUout_WB, mem_data_WB, mulres_WB, divres_WB, PC_wb_WB, wt_data_WB;
 
 
     // IF
-	REG32 REG_PC(.clk(debug_clk),.rst(rst),.CE(PC_EN_IF),.D(next_PC_IF),.Q(PC_IF));
+    assign PC_EN_IF = IS_EN | FU_jump_finish & is_jump_FU;
+
+    REG32 REG_PC(.clk(debug_clk),.rst(rst),.CE(PC_EN_IF),.D(next_PC_IF),.Q(PC_IF));
     
     add_32 add_IF(.a(PC_IF),.b(32'd4),.c(PC_4_IF));
 
-    MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(jump_PC_ID),.s(Branch_ctrl),.o(next_PC_IF));
+    MUX2T1_32 mux_IF(.I0(PC_4_IF),.I1(PC_jump_FU),.s(FU_jump_finish & is_jump_FU),.o(next_PC_IF));
 
-    ROM_D inst_rom(.a(PC_IF[11:2]),.spo(inst_IF));
+    ROM_D inst_rom(.a(PC_IF[8:2]),.spo(inst_IF));
 
 
-    // ID
-    REG_IF_ID reg_IF_ID(.clk(debug_clk),.rst(rst),.EN(reg_FD_EN),.Data_stall(reg_FD_stall),
-        .flush(reg_FD_flush),.PCOUT(PC_IF),.IR(inst_IF),
+    //Issue
+    REG_IF_IS reg_IF_IS(.clk(debug_clk),.rst(rst),.EN(IS_EN),
+        .flush(1'b0),.PCOUT(PC_IF),.IR(inst_IF),
 
-        .IR_ID(inst_ID),.PCurrent_ID(PC_ID));
+        .IR_IS(inst_IS),.PCurrent_IS(PC_IS));
     
-    CtrlUnit ctrl(.inst(inst_ID),.cmp_res(cmp_res_ID),.Branch(Branch_ctrl),.ALUSrc_A(ALUSrc_A_ctrl),
-        .ALUSrc_B(ALUSrc_B_ctrl),.DatatoReg(DatatoReg_ctrl),.RegWrite(RegWrite_ctrl),
-        .mem_w(mem_w_ctrl),.MIO(MIO_ctrl),.rs1use(rs1use_ctrl),.rs2use(rs2use_ctrl),
-        .hazard_optype(hazard_optype_ctrl),.ImmSel(ImmSel_ctrl),.cmp_ctrl(cmp_ctrl),
-        .ALUControl(ALUControl_ctrl),.JALR(JALR));
-    
-    Regs register(.clk(debug_clk),.rst(rst),.L_S(RegWrite_WB),.R_addr_A(inst_ID[19:15]),
-        .R_addr_B(inst_ID[24:20]),.rdata_A(rs1_data_reg),.rdata_B(rs2_data_reg),
-        .Wt_addr(rd_WB),.Wt_data(wt_data_WB),
-        .Debug_addr(debug_addr[4:0]),.Debug_regs(Debug_regs));
-    
-    ImmGen imm_gen(.ImmSel(ImmSel_ctrl),.inst_field(inst_ID),.Imm_out(Imm_out_ID));
-    
-    MUX4T1_32 mux_forward_A(.I0(rs1_data_reg),.I1(ALUout_EXE),.I2(ALUout_MEM),.I3(Datain_MEM),
-        .s(forward_ctrl_A),.o(rs1_data_ID));
-    
-    MUX4T1_32 mux_forward_B(.I0(rs2_data_reg),.I1(ALUout_EXE),.I2(ALUout_MEM),.I3(Datain_MEM),
-        .s(forward_ctrl_B),.o(rs2_data_ID));
-    
-    MUX2T1_32 mux_branch_ID(.I0(PC_ID),.I1(rs1_data_ID),.s(JALR),.o(addA_ID));
+    ImmGen imm_gen(.ImmSel(ImmSel_ctrl),.inst_field(inst_IS),.Imm_out(Imm_out_IS));
 
-    add_32 add_branch_ID(.a(addA_ID),.b(Imm_out_ID),.c(jump_PC_ID));
-
-    cmp_32 cmp_ID(.a(rs1_data_ID),.b(rs2_data_ID),.ctrl(cmp_ctrl),.c(cmp_res_ID));
-    
-    HazardDetectionUnit hazard_unit(.clk(debug_clk),.Branch_ID(Branch_ctrl),.rs1use_ID(rs1use_ctrl),
-        .rs2use_ID(rs2use_ctrl),.hazard_optype_ID(hazard_optype_ctrl),.rd_EXE(rd_EXE),
-        .rd_MEM(rd_MEM),.rs1_ID(inst_ID[19:15]),.rs2_ID(inst_ID[24:20]),.rs2_EXE(rs2_EXE),.cmu_stall(cmu_stall),
-        .PC_EN_IF(PC_EN_IF),.reg_FD_EN(reg_FD_EN),.reg_FD_stall(reg_FD_stall),
-        .reg_FD_flush(reg_FD_flush),.reg_DE_EN(reg_DE_EN),.reg_DE_flush(reg_DE_flush),
-        .reg_EM_EN(reg_EM_EN),.reg_EM_flush(reg_EM_flush),.reg_MW_EN(reg_MW_EN),
-        .forward_ctrl_ls(forward_ctrl_ls),.forward_ctrl_A(forward_ctrl_A),
-        .forward_ctrl_B(forward_ctrl_B));
+    CtrlUnit ctrl(.clk(debug_clk),.rst(rst),.PC(PC_IS),.inst(inst_IS),.imm(Imm_out_IS),
+        .ALU_done(FU_ALU_finish),.MEM_done(FU_mem_finish),.MUL_done(FU_mul_finish),.DIV_done(FU_div_finish),.JUMP_done(FU_jump_finish),.is_jump(is_jump_FU),
+        .IS_en(IS_EN),.ImmSel(ImmSel_ctrl),.ALU_en(FU_ALU_EN),
+        .MEM_en(FU_mem_EN),.MUL_en(FU_mul_EN),.DIV_en(FU_div_EN),.JUMP_en(FU_jump_EN),
+        .PC_ctrl(PC_ctrl),.imm_ctrl(imm_ctrl),.rs1_ctrl(rs1_addr_ctrl),.rs2_ctrl(rs2_addr_ctrl),
+        .JUMP_op(Jump_ctrl),.ALU_op(ALUControl_ctrl),.ALU_use_PC(ALUSrcA_ctrl),.ALU_use_imm(ALUSrcB_ctrl),
+        .MEM_we(mem_w_ctrl),.MEM_bhw(bhw_ctrl),.MUL_op(),.DIV_op(),
+        .write_sel(DatatoReg_ctrl),.reg_write(RegWrite_ctrl),.rd_ctrl(rd_ctrl)    
+    );
 
 
-    // EX
-    REG_ID_EX reg_ID_EX(.clk(debug_clk),.rst(rst),.EN(reg_DE_EN),.flush(reg_DE_flush),.IR_ID(inst_ID),
-		.PCurrent_ID(PC_ID),.rs1_addr(inst_ID[19:15]),.rs2_addr(inst_ID[24:20]),.rs1_data(rs1_data_ID),
-		.rs2_data(rs2_data_ID),.Imm32(Imm_out_ID),.rd_addr(inst_ID[11:7]),.ALUSrc_A(ALUSrc_A_ctrl),
-		.ALUSrc_B(ALUSrc_B_ctrl),.ALUC(ALUControl_ctrl),.DatatoReg(DatatoReg_ctrl),
-        .RegWrite(RegWrite_ctrl),.WR(mem_w_ctrl),.u_b_h_w(inst_ID[14:12]),.MIO(MIO_ctrl),
+    // RO
+    Regs register(.clk(debug_clk),.rst(rst),
+        .R_addr_A(rs1_addr_ctrl),.rdata_A(rs1_data_RO),
+        .R_addr_B(rs2_addr_ctrl),.rdata_B(rs2_data_RO),
+        .L_S(RegWrite_ctrl),.Wt_addr(rd_ctrl),.Wt_data(wt_data_WB),
+        .Debug_addr(debug_addr[4:0]),.Debug_regs(debug_regs));
 
-        .PCurrent_EX(PC_EXE),.IR_EX(inst_EXE),.rs1_EX(rs1_EXE),.rs2_EX(rs2_EXE),
-        .A_EX(rs1_data_EXE),.B_EX(rs2_data_EXE),.Imm32_EX(Imm_EXE),.rd_EX(rd_EXE),
-        .ALUSrc_A_EX(ALUSrc_A_EXE),.ALUSrc_B_EX(ALUSrc_B_EXE),.ALUC_EX(ALUControl_EXE),
-        .DatatoReg_EX(DatatoReg_EXE),.RegWrite_EX(RegWrite_EXE),.WR_EX(mem_w_EXE),
-        .u_b_h_w_EX(u_b_h_w_EXE),.MIO_EX(MIO_EXE));
-    
-    MUX2T1_32 mux_A_EXE(.I0(rs1_data_EXE),.I1(PC_EXE),.s(ALUSrc_A_EXE),.o(ALUA_EXE));
+    MUX2T1_32 mux_imm_ALU_RO_A(.I0(rs1_data_RO),.I1(PC_ctrl),.s(ALUSrcA_ctrl),.o(ALUA_RO));
 
-    MUX2T1_32 mux_B_EXE(.I0(rs2_data_EXE),.I1(Imm_EXE),.s(ALUSrc_B_EXE),.o(ALUB_EXE));
-
-    ALU alu(.A(ALUA_EXE),.B(ALUB_EXE),.Control(ALUControl_EXE),
-        .res(ALUout_EXE),.zero(ALUzero_EXE),.overflow(ALUoverflow_EXE));
-    
-    MUX2T1_32 mux_forward_EXE(.I0(rs2_data_EXE),.I1(Datain_MEM),.s(forward_ctrl_ls),.o(Dataout_EXE));
+    MUX2T1_32 mux_imm_ALU_RO_B(.I0(rs2_data_RO),.I1(imm_ctrl),.s(ALUSrcB_ctrl),.o(ALUB_RO));
 
 
-    // MEM
-    REG_EX_MEM reg_EXE_MEM(.clk(debug_clk),.rst(rst),.EN(reg_EM_EN),.flush(reg_EM_flush),
-        .IR_EX(inst_EXE),.PCurrent_EX(PC_EXE),.ALUO_EX(ALUout_EXE),.B_EX(Dataout_EXE),
-        .rd_EX(rd_EXE),.DatatoReg_EX(DatatoReg_EXE),.RegWrite_EX(RegWrite_EXE),
-        .WR_EX(mem_w_EXE),.u_b_h_w_EX(u_b_h_w_EXE),.MIO_EX(MIO_EXE),
+    // FU
+    FU_ALU alu(.clk(debug_clk),.EN(FU_ALU_EN),.finish(FU_ALU_finish),
+        .ALUControl(ALUControl_ctrl),.ALUA(ALUA_RO),.ALUB(ALUB_RO),.res(ALUout_FU),
+        .zero(),.overflow());
 
-        .PCurrent_MEM(PC_MEM),.IR_MEM(inst_MEM),.ALUO_MEM(ALUout_MEM),.Datao_MEM(Dataout_MEM),
-        .rd_MEM(rd_MEM),.DatatoReg_MEM(DatatoReg_MEM),.RegWrite_MEM(RegWrite_MEM),
-        .WR_MEM(mem_w_MEM),.u_b_h_w_MEM(u_b_h_w_MEM),.MIO_MEM(MIO_MEM));
-    
-    cmu CMU(.clk(debug_clk),.rst(rst),.addr_rw(ALUout_MEM),
-        .en_r(DatatoReg_MEM),.en_w(mem_w_MEM),.u_b_h_w(u_b_h_w_MEM),
-        .data_w(Dataout_MEM),.data_r(Datain_MEM),.stall(cmu_stall),
-        .mem_cs_o(ram_cs),.mem_we_o(ram_we),.mem_addr_o(ram_addr),
-        .mem_data_i(ram_dout),.mem_data_o(ram_din),.mem_ack_i(ram_ack),.cmu_state(cmu_state));
+    FU_mem mem(.clk(debug_clk),.EN(FU_mem_EN),.finish(FU_mem_finish),
+        .mem_w(mem_w_ctrl),.bhw(bhw_ctrl),.rs1_data(rs1_data_RO),.rs2_data(rs2_data_RO),
+        .imm(imm_ctrl),.mem_data(mem_data_FU));
 
-    data_ram RAM(.clk(debug_clk),.rst(rst),.addr(ram_addr),
-		.cs(ram_cs),.we(ram_we),.din(ram_din),.dout(ram_dout),
-		.stall(),.ack(ram_ack),.ram_state(ram_state));
-        
-    // RAM_B data_ram(.addra(ALUout_MEM),.clka(debug_clk),.dina(Dataout_MEM), 
-    //     .wea(mem_w_MEM),.douta(Datain_MEM),.mem_u_b_h_w(u_b_h_w_MEM));
-    
-    assign mem_addr = MIO_MEM ? ALUout_MEM : 32'hFFFFFFFF ;
-	assign mem_data = MIO_MEM ? Datain_MEM : 32'hAA55AA55 ;
+    FU_mul mu(.clk(debug_clk),.EN(FU_mul_EN),.finish(FU_mul_finish),
+        .A(rs1_data_RO),.B(rs2_data_RO),.res(mulres_FU));
+
+    FU_div du(.clk(debug_clk),.EN(FU_div_EN),.finish(FU_div_finish),
+        .A(rs1_data_RO),.B(rs2_data_RO),.res(divres_FU));
+
+    FU_jump ju(.clk(debug_clk),.EN(FU_jump_EN),.finish(FU_jump_finish),
+        .JALR(Jump_ctrl[4]),.cmp_ctrl(Jump_ctrl[3:0]),.rs1_data(rs1_data_RO),.rs2_data(rs2_data_RO),
+        .imm(imm_ctrl),.PC(PC_ctrl),.PC_jump(PC_jump_FU),.PC_wb(PC_wb_FU),.is_jump(is_jump_FU));
+
 
     // WB
-    REG_MEM_WB reg_MEM_WB(.clk(debug_clk),.rst(rst),.EN(reg_MW_EN),.IR_MEM(inst_MEM),
-        .PCurrent_MEM(PC_MEM),.ALUO_MEM(ALUout_MEM),.Datai(Datain_MEM),.rd_MEM(rd_MEM),
-        .DatatoReg_MEM(DatatoReg_MEM),.RegWrite_MEM(RegWrite_MEM),
+    REG32 reg_WB_ALU(.clk(debug_clk),.rst(rst),.CE(FU_ALU_finish),.D(ALUout_FU),.Q(ALUout_WB));
 
-        .PCurrent_WB(PC_WB),.IR_WB(inst_WB),.ALUO_WB(ALUout_WB),.MDR_WB(Datain_WB),
-        .rd_WB(rd_WB),.DatatoReg_WB(DatatoReg_WB),.RegWrite_WB(RegWrite_WB));
+    REG32 reg_WB_mem(.clk(debug_clk),.rst(rst),.CE(FU_mem_finish),.D(mem_data_FU),.Q(mem_data_WB));
+
+    REG32 reg_WB_mul(.clk(debug_clk),.rst(rst),.CE(FU_mul_finish),.D(mulres_FU),.Q(mulres_WB));
+
+    REG32 reg_WB_div(.clk(debug_clk),.rst(rst),.CE(FU_div_finish),.D(divres_FU),.Q(divres_WB));
     
-    MUX2T1_32 mux_WB(.I0(ALUout_WB),.I1(Datain_WB),.s(DatatoReg_WB),.o(wt_data_WB));
-    
-    assign wb_inst = inst_WB;
-    assign wb_pc = PC_WB;
+    REG32 reg_WB_jump(.clk(debug_clk),.rst(rst),.CE(FU_jump_finish),.D(PC_wb_FU),.Q(PC_wb_WB));
 
-	wire [31:0] Test_signal;
-	assign debug_data = debug_addr[5] ? Test_signal : Debug_regs;
-	
-    CPUTEST    U1_3(.PC_IF(PC_IF),
-                    .PC_ID(PC_ID),
-                    .PC_EXE(PC_EXE),
-                    .PC_MEM(PC_MEM),
-                    .PC_WB(PC_WB),
-                    .PC_next_IF(next_PC_IF),
-                    .PCJump(jump_PC_ID),
-                    .inst_IF(inst_IF),
-                    .inst_ID(inst_ID),
-                    .inst_EXE(inst_EXE),
-                    .inst_MEM(inst_MEM),
-                    .inst_WB(inst_WB),
-                    .PCEN(PC_EN_IF),
-                    .Branch(Branch_ctrl),
-                    .PCSource(Branch_ctrl),
-                    .RS1DATA(rs1_data_reg),
-                    .RS2DATA(rs2_data_reg),
-                    .Imm32(Imm_out_ID),
-                    .ImmSel(ImmSel_ctrl),
-                    .ALUC(ALUControl_ctrl),
-                    .ALUSrc_A(ALUSrc_A_ctrl),
-                    .ALUSrc_B(ALUSrc_B_ctrl),
-                    .A(ALUA_EXE),
-                    .B(ALUB_EXE),
-                    .ALU_out(ALUout_MEM),
-                    .Datai(Datain_MEM),
-                    .Datao(Dataout_MEM),
-                    .Addr(Addr),
-                    .WR(MWR),
-                    .MIO(MIO_MEM),
-                    .WDATA(wt_data_WB),
-                    .DatatoReg(DatatoReg_WB),
-                    .RegWrite(RegWrite_WB),
-                    .data_hazard(reg_FD_stall),
-                    .control_hazard(Branch_ctrl),
-                    .cmu_state(cmu_state),
-                    .ram_state(ram_state),
+    MUX8T1_32 mux_DtR(.s(DatatoReg_ctrl),.I0(ALUout_WB),.I1(mem_data_WB),.I2(mulres_WB),.I3(divres_WB),
+        .I4(PC_wb_WB),.I5(32'd0),.I6(32'd0),.I7(32'd0),.o(wt_data_WB));
 
-                    .Debug_addr(debug_addr[4:0]),
-                    .Test_signal(Test_signal)    
-                    );
+    assign wb_addr = rd_ctrl;
+    assign wb_data = wt_data_WB;
+
+    always @(posedge debug_clk) begin
+        if (rst) begin
+            clk_counter <= 0;
+        end else begin
+            clk_counter <= clk_counter + 32'd1;
+        end
+    end
+
+    always @* begin
+        case (debug_addr[4:0])
+            0:  Test_signal = PC_IF;
+            1:  Test_signal = inst_IF;
+            2:  Test_signal = PC_IS;  
+            3:  Test_signal = inst_IS;
+
+            4:  Test_signal = rs1_addr_ctrl;
+            5:  Test_signal = rs1_data_RO;
+            6:  Test_signal = rs2_addr_ctrl;
+            7:  Test_signal = rs2_data_RO;
+
+            8:  Test_signal = ImmSel_ctrl;
+            9:  Test_signal = imm_ctrl;
+            10: Test_signal = ALUout_FU;
+            11: Test_signal = PC_EN_IF;
+
+            12: Test_signal = {15'b0, FU_ALU_EN, 15'b0, FU_ALU_finish};
+            13: Test_signal = ALUControl_ctrl;
+            14: Test_signal = ALUA_RO;
+            15: Test_signal = ALUB_RO;
+
+            16: Test_signal = {15'b0, FU_mem_EN, 15'b0, FU_mem_finish};
+            17: Test_signal = mem_w_ctrl;
+            18: Test_signal = bhw_ctrl;
+            19: Test_signal = mem_data_FU;
+
+            20: Test_signal = {15'b0, FU_mul_EN, 15'b0, FU_mul_finish};
+            21: Test_signal = mulres_FU;
+            22: Test_signal = {15'b0, FU_div_EN, 15'b0, FU_div_finish};
+            23: Test_signal = divres_FU;
+
+            24: Test_signal = {15'b0, FU_jump_EN, 15'b0, FU_jump_finish};
+            25: Test_signal = Jump_ctrl;
+            26: Test_signal = PC_jump_FU;
+            27: Test_signal = PC_wb_FU;
+
+            28: Test_signal = RegWrite_ctrl;
+            29: Test_signal = rd_ctrl;
+            30: Test_signal = DatatoReg_ctrl;
+            31: Test_signal = wt_data_WB;
+            
+            default: Test_signal = 32'hAA55_AA55;
+        endcase
+    end
 
 endmodule

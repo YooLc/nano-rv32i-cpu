@@ -2,34 +2,23 @@ module sim_top;
 
 	// Inputs
 	reg clk;
-	reg rst;
+	reg rstn;
 
-	// Outputs
-	wire [7:0] clk_count;
-	wire [7:0] inst_count;
-	wire [7:0] hit_count;
-
-	// Instantiate the Unit Under Test (UUT)
-	cmu_sim uut (
-		.clk(clk), 
-		.rst(rst), 
-		.clk_count(clk_count), 
-		.inst_count(inst_count), 
-		.hit_count(hit_count)
+	top uut (
+		.CLK100MHZ(clk),
+		.SW(16'b0),
+		.RSTN(rstn)
 	);
-
 
 	initial begin
 		// Initialize Inputs
 		clk = 0;
-		rst = 1;
+		rstn = 0;
 
 		// Wait 100 ns for global reset to finish
-		#95 rst = 0;
+		#95 rstn = 1;
         
 		// Add stimulus here
-		
-
 	end
 	
 	initial forever #10 clk = ~clk;

@@ -101,14 +101,14 @@ module top (
     wire sim_uart_char_valid = uart_valid_debug;
 
     wire [4:0] uart_debug_reg;
-    wire [31:0] wb_pc;
-    wire [31:0] wb_inst;
+    wire [31:0] wb_addr;
+    wire [31:0] wb_data;
 
     wire uart_busy;
 
     assign debug_addr = debug_by_uart? {2'b00, uart_debug_reg} : SW[7:1];
 
-    wire [31:0]mem_addr, mem_data;
+    wire [31:0]clk_counter;
     
     RV32core core(
         .debug_en(SW[0]),
@@ -117,10 +117,9 @@ module top (
         .debug_data(debug_data),
         .clk(clk_cpu),
         .rst(rst_all),
-        .wb_pc(wb_pc),
-        .wb_inst(wb_inst),
-        .mem_addr(mem_addr),
-        .mem_data(mem_data),
+        .wb_addr(wb_addr),
+        .wb_data(wb_data),
+        .clk_counter(clk_counter),
         .interrupter(SW[12])
         );
 
@@ -164,10 +163,10 @@ module top (
         .debug_clk(btn_step),
         .en(debug_uart_en),
         .debug_data(debug_data),
-        .wb_pc(wb_pc),
-        .wb_inst(wb_inst),
-        .mem_addr(mem_addr),
-        .mem_data(mem_data),
+        .I0(wb_addr),
+        .I1(wb_data),
+        .I2(clk_counter),
+        .I3(),
         .uart_busy(uart_busy),
         .debug_addr(uart_debug_reg),
         .sim_uart_char(uart_char_debug),

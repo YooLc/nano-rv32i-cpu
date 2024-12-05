@@ -10,7 +10,7 @@
 // Target Devices: 
 // Tool Versions: 
 // Description: 
-// k 
+// 
 // Dependencies: 
 // 
 // Revision:
@@ -29,7 +29,7 @@ module REG32(
 					);
 					
 	always @(posedge clk or posedge rst)
-		if (rst==1)  Q <= 32'h00000000;
+		if (rst)  Q <= 32'h00000000;
 		else if (CE) Q <= D;
 
 endmodule

@@ -5,12 +5,12 @@ module cmp_32(  input [31:0] a,
                 input [2:0] ctrl,
                 output c
     );
-    parameter cmp_EQ  = 3'b001;
-    parameter cmp_NE  = 3'b010;
-    parameter cmp_LT  = 3'b011;
-    parameter cmp_LTU = 3'b100;
-    parameter cmp_GE  = 3'b101;
-    parameter cmp_GEU = 3'b110;
+    localparam cmp_EQ  = 3'b001;
+    localparam cmp_NE  = 3'b010;
+    localparam cmp_LT  = 3'b011;
+    localparam cmp_LTU = 3'b100;
+    localparam cmp_GE  = 3'b101;
+    localparam cmp_GEU = 3'b110;
 
     wire res_EQ  = a == b;
     wire res_NE  = ~res_EQ;

@@ -1,14 +1,14 @@
 `timescale 1ns / 1ps
 
 module ROM_D(
-    input[7:0] a,
+    input[6:0] a,
     output[31:0] spo
 );
 
-    reg[31:0] inst_data[0:255];
+    reg[31:0] inst_data[0:127];
 
     initial	begin
-        $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\core\\rom.mem", inst_data);
+        $readmemh("rom.mem", inst_data);
     end
 
     assign spo = inst_data[a];

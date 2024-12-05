@@ -1,24 +1,45 @@
 `timescale 1ns / 1ps
 
-module ALU(
-    input[31:0] A, B,
-    input[3:0] Control,
+module FU_ALU(
+    input clk, EN,
+    input[3:0] ALUControl,
+    input[31:0] ALUA, ALUB,
     output[31:0] res,
-    output zero, overflow
+    output zero, overflow,
+    output finish
 );
 
-    parameter ALU_ADD  = 4'b0001;
-    parameter ALU_SUB  = 4'b0010;
-    parameter ALU_AND  = 4'b0011;
-    parameter ALU_OR   = 4'b0100;
-    parameter ALU_XOR  = 4'b0101;
-    parameter ALU_SLL  = 4'b0110;
-    parameter ALU_SRL  = 4'b0111;
-    parameter ALU_SLT  = 4'b1000;
-    parameter ALU_SLTU = 4'b1001;
-    parameter ALU_SRA  = 4'b1010;
-    parameter ALU_Ap4  = 4'b1011;
-    parameter ALU_Bout = 4'b1100;
+    reg state;
+    assign finish = state == 1'b1;
+    initial begin
+        state = 0;
+    end
+
+    reg[3:0] Control;
+    reg[31:0] A, B;
+
+    always@(posedge clk) begin
+        if(EN & ~state) begin // state == 0
+            A <= ALUA;
+            B <= ALUB;
+            Control <= ALUControl;
+            state <= 1;
+        end
+        else state <= 0;
+    end
+    
+    localparam ALU_ADD  = 4'b0001;
+    localparam ALU_SUB  = 4'b0010;
+    localparam ALU_AND  = 4'b0011;
+    localparam ALU_OR   = 4'b0100;
+    localparam ALU_XOR  = 4'b0101;
+    localparam ALU_SLL  = 4'b0110;
+    localparam ALU_SRL  = 4'b0111;
+    localparam ALU_SLT  = 4'b1000;
+    localparam ALU_SLTU = 4'b1001;
+    localparam ALU_SRA  = 4'b1010;
+    localparam ALU_Ap4  = 4'b1011;
+    localparam ALU_Bout = 4'b1100;
 
     wire[4:0] shamt = B[4:0];
     wire[32:0] res_subu = {1'b0,A} - {1'b0,B};

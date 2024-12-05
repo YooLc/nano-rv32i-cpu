@@ -8,10 +8,10 @@ module debug_ctrl (
     input debug_clk,
     input wire en,
     input wire [31:0] debug_data,
-    input wire [31:0] wb_pc,
-    input wire [31:0] wb_inst,
-    input wire [31:0] mem_addr,
-    input wire [31:0] mem_data,
+    input wire [31:0] I0,
+    input wire [31:0] I1,
+    input wire [31:0] I2,
+    input wire [31:0] I3,
     // [MODIFY] add other input debugged signals here, should be 32 bits
     input wire uart_busy,
     output wire [4:0] debug_addr,
@@ -42,20 +42,20 @@ module debug_ctrl (
     // 8 chars - hex of 32 bits signal
     // 2 chars - "\n\r"    
     localparam BEAT_CUST = 19;  // 7+3+8+2-1
-    localparam NUM_CUST_SIG = 4; // [MODIFY] +1 when add a new debugged signal
+    localparam NUM_CUST_SIG = 3; // [MODIFY] +1 when add a new debugged signal
 
     wire [31:0] cust_sig_list [0:31];
-    assign cust_sig_list[0] = wb_pc;
-    assign cust_sig_list[1] = wb_inst;
-    assign cust_sig_list[2] = mem_addr;
-    assign cust_sig_list[3] = mem_data;
+    assign cust_sig_list[0] = I0;
+    assign cust_sig_list[1] = I1;
+    assign cust_sig_list[2] = I2;
+    assign cust_sig_list[3] = I3;
     // [MODIFY] assign new signal here
     // assign cust_sig_list[2] = xxx;
 
     wire[55:0] cust_name_list [0:31];
-    assign cust_name_list[0] = STR_PC;
-    assign cust_name_list[1] = STR_INST;
-    assign cust_name_list[2] = "MEMADDR";
+    assign cust_name_list[0] = "WB_ADDR";
+    assign cust_name_list[1] = "WB_DATA";
+    assign cust_name_list[2] = "CLK_CNT";
     assign cust_name_list[3] = "MEMDATA";
     // [MODIFY] assign new signal here
     // assign cust_name_list[2] = "xxxxxxx"; (7 chars!)
@@ -65,6 +65,7 @@ module debug_ctrl (
 
     localparam CNT_REG = NUM_REG-1;
     localparam CNT_CUST = NUM_CUST_SIG - 1;
+    localparam LINE_SZ = 4;
  
     // State
     localparam sIDLE = 2'b00;
@@ -79,6 +80,7 @@ module debug_ctrl (
     reg[1:0] state;
     reg[4:0] reg_counter;
     reg[4:0] beat_counter;
+    reg[3:0] line_counter;
     
     // Used to ensure that only one round of 
     // printing will be done during the raising debug_clk
@@ -140,6 +142,7 @@ module debug_ctrl (
             reg_counter <= 5'd1;
             beat_counter <= 5'd0;
             cust_counter <= 0;
+            line_counter <= 0;
         end else begin 
             case(state)
                 sREG: begin
@@ -149,18 +152,25 @@ module debug_ctrl (
                                    : reg_counter;
                     beat_counter <= reg_beat_done ? 0 :
                                    uart_busy ? beat_counter : beat_counter + 1;
-                end
+                    line_counter <= reg_beat_done ? 
+                                    line_counter == LINE_SZ - 1 ? 0 : line_counter + 1
+                                    : line_counter;
+                end 
                 sCUST: begin
                     cust_counter <= cust_beat_done ? 
                                   cust_cnt_full ? 0 : cust_counter + 1 
                                   : cust_counter;
                     beat_counter <= cust_beat_done ? 0 :
                                    uart_busy ? beat_counter : beat_counter + 1;
+                    line_counter <= cust_beat_done ? 
+                                    line_counter == LINE_SZ - 1 ? 0 : line_counter + 1 : 
+                                    cust_cnt_full ? 0 : line_counter;
                 end
                 default: begin
                     reg_counter <= 5'd1;
                     beat_counter <= 5'd0;
                     cust_counter <= 0;
+                    line_counter <= 0;
                 end
             endcase
         end
@@ -183,10 +193,12 @@ module debug_ctrl (
 
     // xRR=0xXXXXXXXX\n\r - 16 chars
     // WB_XXXX=0xXXXXXXXX\n\r - 20 chars
+    wire [15:0] split = line_counter == LINE_SZ - 1 || cust_cnt_full ? {"\n",8'h0d} : {"  "};
+
     assign ascii_buffer = {ascii_char[7],ascii_char[6],ascii_char[5],ascii_char[4],
                            ascii_char[3],ascii_char[2],ascii_char[1],ascii_char[0]};
-    assign str_buffer = state == sREG ? {reg_name, STR_COLON, ascii_buffer, "\n",8'h0d, 32'd0}:
-                        state == sCUST  ? {cust_name, STR_COLON, ascii_buffer, "\n",8'h0d} : 0;
+    assign str_buffer = state == sREG ? {reg_name, STR_COLON, ascii_buffer, split, 32'd0}:
+                        state == sCUST  ? {cust_name, STR_COLON, ascii_buffer, split} : 0;
     
     //sgenvar i;
     generate for(i = 0; i < 20; i = i + 1)
