@@ -30,7 +30,7 @@ module data_ram (
 		for (i = 12; i < (1<<ADDR_WIDTH); i = i + 1) begin
 			data[i] <= 32'b0;
 		end
-		$readmemh("ram.mem", data);
+		$readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\cache\\ram.mem", data);
 	end
 
 	reg [2:0]state = 0;
