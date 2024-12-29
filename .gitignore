@@ -1,3 +1,5 @@
 *.dcp
 *.xci
 .directory
+.vscode/
+settings.json

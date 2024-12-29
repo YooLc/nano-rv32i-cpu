@@ -17,6 +17,7 @@ module sim_top;
         clk = 0;
         rst = 1;
         #2 rst = 0;
+        #200 $finish;
     end
     always #1 clk = ~clk;
 
