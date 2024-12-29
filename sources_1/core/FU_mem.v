@@ -35,6 +35,6 @@ module FU_mem(
     add_32 add(.a(rs1_data_reg),.b(imm_reg),.c(addr));
 
     RAM_B ram(.clka(clk),.addra(addr),.dina(rs2_data_reg),.wea(mem_w_reg),
-        .douta(mem_data),.mem_u_b_h_w(bhw_reg));
+        .douta(mem_data),.mem_u_b_h_w(bhw_reg), .finish(finish));
 
 endmodule

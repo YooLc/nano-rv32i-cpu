@@ -13,23 +13,24 @@
 `define Imm_type_S 3'b100
 `define Imm_type_U 3'b101
 
-// bits in FUS
+// bits in RS entry
 `define BUSY    0
 `define OP_L    1
 `define OP_H    5
-`define DST_L   6
-`define DST_H   10
-`define SRC1_L  11
-`define SRC1_H  15
-`define SRC2_L  16
-`define SRC2_H  20
-`define FU1_L   21 // i.e. Qj,Qk
-`define FU1_H   23
-`define FU2_L   24
-`define FU2_H   26
-`define RDY1    27 // i.e. Rj,Rk
-`define RDY2    28
-`define FU_DONE 29
+`define Q1_L  8
+`define Q1_H  15
+`define Q2_L  16
+`define Q2_H  23
+`define V1_L   32 
+`define V1_H   63
+`define V2_L   64
+`define V2_H   95
+`define A_L    96   
+`define A_H    127
+`define PC_L    128 // for JUMP FU calculation, also for debug
+`define PC_H    159
+
+`define MAXLEN 10
 
 // op in FUS
 `define ALU_ADD     5'b0_0001

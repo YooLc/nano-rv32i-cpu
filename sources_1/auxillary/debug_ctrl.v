@@ -53,8 +53,8 @@ module debug_ctrl (
     // assign cust_sig_list[2] = xxx;
 
     wire[55:0] cust_name_list [0:31];
-    assign cust_name_list[0] = "WB_ADDR";
-    assign cust_name_list[1] = "WB_DATA";
+    assign cust_name_list[0] = "CDB_PC ";
+    assign cust_name_list[1] = "CDB_DAT";
     assign cust_name_list[2] = "CLK_CNT";
     assign cust_name_list[3] = "MEMDATA";
     // [MODIFY] assign new signal here

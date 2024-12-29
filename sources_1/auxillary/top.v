@@ -123,20 +123,20 @@ module top (
         .interrupter(SW[12])
         );
 
-    display DISPLAY (
-        .clk(led_clk),
-        .rst(rst_all),
-        .en(8'b11111111),
-        .data(debug_data),
-        .dot(8'b00000000),
-        .led(led_array),
-        .led_clk(),
-        .led_en(),
-        .led_do(),
-        .seg_ca(seg_ca),
-        .seg_an(AN),
-        .led_clr_n()
-        );
+//    display DISPLAY (
+//        .clk(led_clk),
+//        .rst(rst_all),
+//        .en(8'b11111111),
+//        .data(debug_data),
+//        .dot(8'b00000000),
+//        .led(led_array),
+//        .led_clk(),
+//        .led_en(),
+//        .led_do(),
+//        .seg_ca(seg_ca),
+//        .seg_an(AN),
+//        .led_clr_n()
+//        );
 
     UART_TX_CTRL uart_tx_ctrl (
         .SEND(uart_send),
