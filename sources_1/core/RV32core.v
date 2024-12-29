@@ -63,7 +63,7 @@ module  RV32core(
     wire FU_stall;
 
     // IF
-    assign PC_EN_IF = IS_EN | (FU_jump_finish & is_jump_FU);
+    assign PC_EN_IF = IS_EN | IS_flush | (FU_jump_finish & is_jump_FU);
 
     REG32 REG_PC(.clk(debug_clk),.rst(rst),.CE(PC_EN_IF),.D(next_PC_IF),.Q(PC_IF));
     
@@ -74,7 +74,7 @@ module  RV32core(
     ROM_D inst_rom(.a(PC_IF[10:2]),.spo(inst_IF));
 
     // Issue
-    REG_IF_IS reg_IF_IS(.clk(debug_clk),.rst(rst),.EN(IS_EN),
+    REG_IF_IS reg_IF_IS(.clk(debug_clk),.rst(rst),.EN(IS_EN | IS_flush),
         .flush(1'b0),.PCOUT(PC_IF),.IR(inst_IF),
         .IR_IS(inst_IS),.PCurrent_IS(PC_IS));
     
@@ -99,7 +99,7 @@ module  RV32core(
         .rst(rst),
 
         // for tomasulo IS
-	    .rs_rd_w_en(rs_rd_w_en & IS_EN), // does this instr need to write reg? If so, we need to update RAT
+	    .rs_rd_w_en(rs_rd_w_en & ~ctrl_stall & ~IS_flush), // does this instr need to write reg? If so, we need to update RAT
 	    .R_addr_rd(rd_ctrl),    // target reg
 	    .rs_num_rd(rs_num_rd),  // free RS entry, RAT[target reg] = free RS entry
 	    .rs_num_A(rs_num_A),    // Qj, the reservation station number of source reg A
@@ -130,27 +130,43 @@ module  RV32core(
         .o(ALUB_RO)
     );
 
-     // if u don't implement ROB, when encountering a jump instr, just stall as u did in lab5; for structure hazard, stall as well
-    // IS_flush = 1'b0
-    assign IS_EN = ~FU_stall & ~ctrl_stall;
+    // if u don't implement ROB, when encountering a jump instr, just stall as u did in lab5; for structure hazard, stall as well
+    reg IS_flush = 0;
 
-    // Structural Hazard
+    // Structure hazard
     assign FU_stall = (ALU_use && rs_num_rd_ALU == 0)
                     | (MEM_use && rs_num_rd_MEM == 0)
                     | (MUL_use && rs_num_rd_MUL == 0)
                     | (DIV_use && rs_num_rd_DIV == 0)
                     | (JUMP_use && rs_num_rd_JUMP == 0);
-   
+
+    assign IS_EN = ~IS_flush & (~FU_stall & ~ctrl_stall);
+
+    // Control stall - Lab 5
     always @ (posedge clk or posedge rst) begin
         if (rst) begin
             ctrl_stall <= 0;
         end
         else begin
-            if (IS_EN && JUMP_use) begin
+            // IS
+            if (IS_EN & JUMP_use) begin
                 ctrl_stall <= 1;
-            end else if (FU_jump_finish) begin
+            end
+            else if (FU_jump_finish) begin
                 ctrl_stall <= 0;
             end
+        end
+    end
+
+    always @ (posedge clk or posedge rst) begin
+        if (rst) begin
+            IS_flush <= 0;
+        end
+        else if (FU_jump_finish & is_jump_FU) begin
+            IS_flush <= 1;
+        end
+        else begin
+            IS_flush <= 0;
         end
     end
 
@@ -166,8 +182,8 @@ module  RV32core(
     RS #(.FU(`FU_ALU), .num(3)) rs_alu (
         .clk(debug_clk),
 	    .rst(rst),
-		
-		.selected(ALU_use & IS_EN),
+
+		.selected(ALU_use & IS_EN), // Only enter RS when Issue
 	    .free_rs(rs_num_rd_ALU), // Free RS entry
 	    .op(op_IS),
 		.Qj(rs_num_A), // RS that will produce src1

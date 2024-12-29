@@ -17,7 +17,7 @@ module RAM_B(
     reg[7:0] data[0:SIZE-1];
 
     initial	begin
-        $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\core\\ram.mem", data);
+        $readmemh("D:\\ArchExp\\aRCH\\aRCH.srcs\\sources_1\\core\\lab3_ram.mem", data);
     end
 
     always @ (negedge clka) begin

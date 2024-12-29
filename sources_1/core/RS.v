@@ -36,7 +36,6 @@ module RS #(
     output wire [31:0] pc_debug
 );
     integer i;
-    // localparam LOG_NUM = $clog2(num);
 
     reg [`PC_H:0] RS[1:num];
 
